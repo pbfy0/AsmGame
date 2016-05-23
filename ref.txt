@@ -1,0 +1,113 @@
+Instruction
+
+fxoooooo xxyyyzzz XXXXXXXX:XXXXXXXX YYYYYYYY:YYYYYYYY ZZZZZZZZ:ZZZZZZZZ
+^^^      ^ ^  ^           ^                 ^                 ^
+|||      | |  |           |                 |                 \-------- 16-bit argument 3
+|||      | |  |           |                 \-------------------------- 16-bit argument 2
+|||      | |  |           \-------------------------------------------- 16-bit argument 1
+|||      | |  \-------------------------------------------------------- argument 3 type
+|||      | \----------------------------------------------------------- argument 2 type
+|||      \------------------------------------------------------------- argument 1 type
+||\-------------------------------------------------------------------- 7-bit opcode
+|\--------------------------------------------------------------------- argument 1 type m1 bit
+\---------------------------------------------------------------------- sets flags?
+
+Argument type:
+
+m1  m2  r
+0   0   0 ---- constant
+0   0   1 ---- register
+0   1   0 ---- memory (8-bit)
+1   0   0 ---- memory (16-bit)
+1   1   0 ---- memory (32-bit)
+0   1   1 ---- pointer (8-bit)
+1   0   1 ---- pointer (16-bit)
+1   1   1 ---- pointer (32-bit)
+
+m1  m2  r
+0   0   0 ---- constant
+0   0   1 ---- register
+0   1   0 ---- memory (8-bit)
+0   1   1 ---- pointer (8-bit)
+1   0   0 ---- memory (16-bit)
+1   0   1 ---- pointer (16-bit)
+1   1   0 ---- memory (32-bit)
+1   1   1 ---- pointer (32-bit)
+
+Registers:
+
+r0-r29: general-purpose
+sp (r30): stack pointer
+pc (r31): program counter
+
+Opcodes:
+00: lsl
+	XX <- YY << ZZ
+01: rsc
+	XX <- YY << 16 | ZZ
+02: mmv (ldr, str)
+    *(mXX + ZZ) <- *(mYY + ZZ)
+or	XX <- *(mYY + ZZ)
+or	*(mXX + ZZ) <- YY
+or	XX <- YY
+03: lsr
+	XX <- YY >> ZZ (unsigned)
+04: asr
+	XX <- YY >> ZZ (signed)
+05: add (mov, ldr, str)
+    XX <- YY + ZZ
+06: sub
+	XX <- YY - ZZ
+07: push (up to 3 operands)
+    for each valid operand:
+	    *(sp -= 4) = operand
+08: pop  (dt)
+    for each valid operand:
+	    operand = *sp
+		sp += 4
+09: and
+0a: or
+0b: xor
+	XX <- YY (op) ZZ
+0c: mul
+	XX <- YY * ZZ
+10: call absolute
+    push pc
+	jump to XX
+1e: syscall (table index)
+	increments mode
+	saves return address on syscall stack (not in memory)
+	jumps to *($7E00 + XX * 2)
+	
+1f: ret
+    if mode == 0: set pc to (pop)
+	decrements mode
+	pop pc from syscall stack
+
+3f: reset
+	set mode to 1
+	set syscall stack to [$8000]
+	jump to $0000
+	
+Argument encoding:
+
+register:
+00000000:00000000 # null input
+00000000:110rrrrr # normal 32-bit register
+0011cccc:110rrrrr # 32-bit register + extended condition code (lazy, so same as arm)
+110xxxxx:110yyyyy # 64-bit register, undocumented
+constant:
+CCCCCCCC:CCCCCCCC
+
+Word size:
+00: 32-bit
+01: 16-bit
+10: 8-bit
+
+null output: constant
+
+constant:
+
+mov r0, r1 -> add r0, r1, #0
+ldr r0, [r1] -> add r0, [r1], #0
+str r0, [r1 + #8] -> mmv r0, [r1], #8
